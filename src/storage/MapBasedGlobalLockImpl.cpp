@@ -19,7 +19,7 @@ bool MapBasedGlobalLockImpl::Put(const std::string &key, const std::string &valu
 bool MapBasedGlobalLockImpl::PutIfAbsent(const std::string &key, const std::string &value) {
     auto record = _fetch(key);
     if (record.first) {
-        _insert_fst(record.second);
+        _place_fst(record.second);
     } else {
         _insert_fst_new(key, value);
     }
@@ -76,7 +76,7 @@ bool MapBasedGlobalLockImpl::_drop_lst() {
     return exists;
 }
 
-void MapBasedGlobalLockImpl::_insert_fst(std::shared_ptr<list_elem> elem) {
+void MapBasedGlobalLockImpl::_place_fst(std::shared_ptr<list_elem> elem) {
     elem->prev = nullptr;
     elem->next = _content_fst;
     _content_fst = elem;
