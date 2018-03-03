@@ -67,7 +67,7 @@ bool MapBasedGlobalLockImpl::Delete(const std::string &key) {
     _mtx.lock();
     auto record = _fetch(key);
     if(record.first) {
-      _backend.erase(key);
+        _backend.erase(key);
     }
 
     _mtx.unlock();
@@ -131,7 +131,7 @@ bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value)
     _backend[key] = elem;
     auto elem_size = elem->get_size();
     if(elem_size > _max_size) {
-      return true;
+        return true;
     }
 
     _place_fst(elem);
@@ -141,7 +141,7 @@ bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value)
         bool to_drop = _drop_lst();
 
         while (_current_size > _max_size && to_drop) {
-          to_drop = _drop_lst();
+            to_drop = _drop_lst();
         }
     }
 
