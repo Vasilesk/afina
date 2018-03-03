@@ -13,7 +13,7 @@
 namespace Afina {
 namespace Backend {
 
-const int content_max_size = 1024;
+const int content_max_size = 1000;
 
 struct list_elem {
     std::string key;
@@ -26,6 +26,7 @@ struct list_elem {
                                                                                                           prev(p),
                                                                                                           next(n)
                                                                                                           {}
+    size_t get_size();
 };
 
 /**
@@ -78,7 +79,8 @@ private:
     void _place_fst(std::shared_ptr<list_elem> elem);
 
     // _insert_fst_new stores data and places it to the last place of LRU list
-    void _insert_fst_new(std::string key, std::string value);
+    // returns true if data was stored
+    bool _insert_fst_new(std::string key, std::string value);
 };
 
 void pop_from_list(std::shared_ptr<list_elem>);
