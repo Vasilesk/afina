@@ -86,7 +86,7 @@ TEST(StorageTest, Delete) {
 
 const int big_i = 100000;
 TEST(StorageTest, BigTest) {
-    MapBasedGlobalLockImpl storage(big_i);
+    MapBasedGlobalLockImpl storage(big_i * 100);
 
     std::stringstream ss;
 
@@ -119,11 +119,11 @@ TEST(StorageTest, BigTest) {
 }
 
 TEST(StorageTest, MaxTest) {
-    MapBasedGlobalLockImpl storage(1000);
+    MapBasedGlobalLockImpl storage(2 * 7 * 1000);
 
     std::stringstream ss;
 
-    for(long i=0; i<1100; ++i)
+    for(long i=1000; i<2100; ++i)
     {
         ss << "Key" << i;
         std::string key = ss.str();
@@ -134,7 +134,7 @@ TEST(StorageTest, MaxTest) {
         storage.Put(key, val);
     }
 
-    for(long i=100; i<1100; ++i)
+    for(long i=1100; i<2100; ++i)
     {
         ss << "Key" << i;
         std::string key = ss.str();
@@ -149,7 +149,7 @@ TEST(StorageTest, MaxTest) {
         EXPECT_TRUE(val == res);
     }
 
-    for(long i=0; i<100; ++i)
+    for(long i=1000; i<1100; ++i)
     {
         ss << "Key" << i;
         std::string key = ss.str();
