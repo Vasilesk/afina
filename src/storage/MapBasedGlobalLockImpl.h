@@ -76,14 +76,14 @@ private:
     bool _drop_lst();
 
     // _fetch fetches element from LRU list by its pointer
-    std::pair<bool, std::shared_ptr<list_elem>> _fetch(std::string key);
+    std::pair<bool, std::shared_ptr<list_elem>> _fetch(const std::string &key);
 
     // _place_fst places stored data to the last place of LRU
     void _place_fst(std::shared_ptr<list_elem> elem);
 
     // _insert_fst_new stores data and places it to the last place of LRU list
     // returns true if data was stored
-    bool _insert_fst_new(std::string key, std::string value);
+    bool _insert_fst_new(const std::string &key, const std::string &value);
 };
 
 void pop_from_list(std::shared_ptr<list_elem>);

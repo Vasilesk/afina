@@ -86,7 +86,7 @@ bool MapBasedGlobalLockImpl::Get(const std::string &key, std::string &value) con
     return record.first;
 }
 
-std::pair<bool, std::shared_ptr<list_elem>> MapBasedGlobalLockImpl::_fetch(std::string key) {
+std::pair<bool, std::shared_ptr<list_elem>> MapBasedGlobalLockImpl::_fetch(const std::string &key) {
     if (_backend.find(key) != _backend.end()) {
         auto elem = _backend[key];
         pop_from_list(elem);
@@ -126,7 +126,7 @@ void MapBasedGlobalLockImpl::_place_fst(std::shared_ptr<list_elem> elem) {
     }
 }
 
-bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value) {
+bool MapBasedGlobalLockImpl::_insert_fst_new(const std::string &key, const std::string &value) {
     std::shared_ptr<list_elem>elem = std::make_shared<list_elem>(key, value, nullptr, nullptr);
     _backend[key] = elem;
     auto elem_size = elem->get_size();
