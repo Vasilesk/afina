@@ -159,3 +159,27 @@ TEST(StorageTest, MaxTest) {
         EXPECT_FALSE(storage.Get(key, res));
     }
 }
+
+TEST(StorageTest, VeryBigObjMaxTest) {
+    MapBasedGlobalLockImpl storage(8);
+
+    storage.Put("K1", "V1");
+    storage.Put("K2", "V2");
+    storage.Put("K3", "V3");
+
+    std::string value;
+    EXPECT_FALSE(storage.Get("K1", value));
+    EXPECT_FALSE(value == "V1");
+
+    EXPECT_TRUE(storage.Get("K2", value));
+    EXPECT_TRUE(value == "V2");
+
+    storage.Put("K33", "V33");
+
+    std::string value2;
+    EXPECT_TRUE(storage.Get("K33", value2));
+    EXPECT_TRUE(value2 == "V33");
+
+    EXPECT_FALSE(storage.Get("K2", value2));
+    EXPECT_FALSE(value2 == "V2");
+}
