@@ -4,6 +4,8 @@
 
 #include <tuple>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 
 namespace Afina {
 namespace Backend {
@@ -14,51 +16,73 @@ size_t list_elem::get_size() {
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::Put(const std::string &key, const std::string &value) {
+    _mtx.lock();
+    bool size_err = false;
     auto record = _fetch(key);
-    _insert_fst_new(key, value);
+    size_err = _insert_fst_new(key, value);
 
+    _mtx.unlock();
+    if(size_err) {
+        throw std::length_error(err_size);
+    }
     return !record.first;
 }
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::PutIfAbsent(const std::string &key, const std::string &value) {
+    _mtx.lock();
+    bool size_err = false;
     auto record = _fetch(key);
     if (record.first) {
         _place_fst(record.second);
     } else {
-        _insert_fst_new(key, value);
+        size_err = _insert_fst_new(key, value);
     }
 
+    _mtx.unlock();
+    if(size_err) {
+        throw std::length_error(err_size);
+    }
     return !record.first;
 }
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::Set(const std::string &key, const std::string &value) {
+    _mtx.lock();
+    bool size_err = false;
     auto record = _fetch(key);
     if (record.first) {
-       _insert_fst_new(key, value);
+       size_err = _insert_fst_new(key, value);
     }
 
+    _mtx.unlock();
+    if(size_err) {
+        throw std::length_error(err_size);
+    }
     return record.first;
 }
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::Delete(const std::string &key) {
+    _mtx.lock();
     auto record = _fetch(key);
     if(record.first) {
       _backend.erase(key);
     }
 
+    _mtx.unlock();
     return record.first;
 }
 
 // See MapBasedGlobalLockImpl.h
 bool MapBasedGlobalLockImpl::Get(const std::string &key, std::string &value) const {
+    _mtx.lock();
     auto record = const_cast<MapBasedGlobalLockImpl*>(this)->_fetch(key);
     if(record.first) {
         value = record.second->value;
     }
 
+    _mtx.unlock();
     return record.first;
 }
 
@@ -107,8 +131,7 @@ bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value)
     _backend[key] = elem;
     auto elem_size = elem->get_size();
     if(elem_size > _max_size) {
-      // delele elem if no shared_ptr
-      return false;
+      return true;
     }
 
     _place_fst(elem);
@@ -122,7 +145,7 @@ bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value)
         }
     }
 
-    return true;
+    return false;
 }
 
 void pop_from_list(std::shared_ptr<list_elem> elem) {

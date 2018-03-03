@@ -2,6 +2,7 @@
 #include <iostream>
 #include <set>
 #include <vector>
+#include <stdexcept>
 
 #include <storage/MapBasedGlobalLockImpl.h>
 #include <afina/execute/Get.h>
@@ -182,4 +183,17 @@ TEST(StorageTest, VeryBigObjMaxTest) {
 
     EXPECT_FALSE(storage.Get("K2", value2));
     EXPECT_FALSE(value2 == "V2");
+}
+
+TEST(StorageTest, TooBigObjMaxTest) {
+    MapBasedGlobalLockImpl storage(1);
+    bool exception_occured = false;
+    try {
+        storage.Put("K1", "V1");
+    }
+    catch (std::length_error) {
+        exception_occured = true;
+    }
+
+    EXPECT_TRUE(exception_occured);
 }

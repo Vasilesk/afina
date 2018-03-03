@@ -7,6 +7,7 @@
 
 #include <tuple>
 #include <memory>
+#include <mutex>
 
 #include <afina/Storage.h>
 
@@ -64,6 +65,8 @@ public:
 private:
     size_t _max_size;
     size_t _current_size;
+    const std::string err_size = "data size is too big";
+    mutable std::mutex _mtx;
     std::map<std::string, std::shared_ptr<list_elem>> _backend;
 
     std::shared_ptr<list_elem> _content_fst = nullptr;
