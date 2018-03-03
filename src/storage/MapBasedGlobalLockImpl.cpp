@@ -79,11 +79,11 @@ bool MapBasedGlobalLockImpl::_drop_lst() {
         if (content != _backend.end()) {
             _backend.erase(content);
         }
-        _current_size -= 1;
+        _current_size -= _content_lst->get_size();
         pop_from_list(_content_lst);
         _content_lst = _content_lst->prev;
         if(_content_lst == nullptr) {
-            _content_fst = _content_lst;
+            _content_fst = nullptr;
         }
     }
 
@@ -105,9 +105,15 @@ void MapBasedGlobalLockImpl::_place_fst(std::shared_ptr<list_elem> elem) {
 bool MapBasedGlobalLockImpl::_insert_fst_new(std::string key, std::string value) {
     std::shared_ptr<list_elem>elem = std::make_shared<list_elem>(key, value, nullptr, nullptr);
     _backend[key] = elem;
+    auto elem_size = elem->get_size();
+    if(elem_size > _max_size) {
+      // delele elem if no shared_ptr
+      return false;
+    }
+
     _place_fst(elem);
 
-    _current_size += 1;
+    _current_size += elem_size;
     if(_current_size > _max_size) {
         bool to_drop = _drop_lst();
 
