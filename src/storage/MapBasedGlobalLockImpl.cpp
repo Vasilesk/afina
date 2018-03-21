@@ -20,7 +20,10 @@ bool MapBasedGlobalLockImpl::Put(const std::string &key, const std::string &valu
     bool size_err = false;
     auto record = _fetch(key);
     size_err = _insert_fst_new(key, value);
-
+    if (size_err && record.first) {
+        _current_size += record.second->get_size();
+        const_cast<MapBasedGlobalLockImpl*>(this)->_place_fst(record.second);
+    }
     _mtx.unlock();
     if(size_err) {
         throw std::length_error(err_size);
@@ -80,6 +83,7 @@ bool MapBasedGlobalLockImpl::Get(const std::string &key, std::string &value) con
     auto record = const_cast<MapBasedGlobalLockImpl*>(this)->_fetch(key);
     if(record.first) {
         value = record.second->value;
+        const_cast<MapBasedGlobalLockImpl*>(this)->_place_fst(record.second);
     }
 
     _mtx.unlock();
@@ -90,6 +94,7 @@ std::pair<bool, std::shared_ptr<list_elem>> MapBasedGlobalLockImpl::_fetch(const
     if (_backend.find(key) != _backend.end()) {
         auto elem = _backend[key];
         pop_from_list(elem);
+        _current_size -= elem->get_size();
         return std::pair<bool, std::shared_ptr<list_elem>>(true, elem);
     }
 
@@ -131,6 +136,7 @@ bool MapBasedGlobalLockImpl::_insert_fst_new(const std::string &key, const std::
     _backend[key] = elem;
     auto elem_size = elem->get_size();
     if(elem_size > _max_size) {
+        // std::cout << _max_size << " here! " << elem_size << '\n';
         return true;
     }
 
