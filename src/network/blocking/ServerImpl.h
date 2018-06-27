@@ -40,10 +40,17 @@ protected:
     /**
      * Methos is running for each connection
      */
-    void RunConnection();
+    void RunConnection(int client_socket);
+    void CloseConnection(int client_socket);
 
 private:
+    int server_socket;
+    const size_t BUFFER_SIZE = 2048;
+
     static void *RunAcceptorProxy(void *p);
+    static void *RunConnectionProxy(void *p);
+    static bool sendChunks(int client_socket, const char* message_ptr, size_t message_length);
+    static bool recChunks(int client_socket, char* message_ptr, size_t message_length);
 
     // Atomic flag to notify threads when it is time to stop. Note that
     // flag must be atomic in order to safely publisj changes cross thread

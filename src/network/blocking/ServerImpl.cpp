@@ -19,6 +19,9 @@
 
 #include <afina/Storage.h>
 
+#include <protocol/Parser.h>
+#include <afina/execute/Command.h>
+
 namespace Afina {
 namespace Network {
 namespace Blocking {
@@ -30,6 +33,19 @@ void *ServerImpl::RunAcceptorProxy(void *p) {
     } catch (std::runtime_error &ex) {
         std::cerr << "Server fails: " << ex.what() << std::endl;
     }
+    return 0;
+}
+
+void *ServerImpl::RunConnectionProxy(void *p) {
+    auto server_client_pair = reinterpret_cast<std::pair<ServerImpl*, int>*>(p);
+    auto srv = server_client_pair->first;
+    auto client_socket = server_client_pair->second;
+    try {
+        srv->RunConnection(client_socket);
+    } catch (std::runtime_error &ex) {
+        std::cerr << "Server fails: " << ex.what() << std::endl;
+    }
+    srv->CloseConnection(client_socket);
     return 0;
 }
 
@@ -91,6 +107,8 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 void ServerImpl::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
     running.store(false);
+
+    shutdown(server_socket, SHUT_RDWR);
 }
 
 // See Server.h
@@ -123,7 +141,7 @@ void ServerImpl::RunAcceptor() {
     // - Family: IPv4
     // - Type: Full-duplex stream (reliable)
     // - Protocol: TCP
-    int server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+    server_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server_socket == -1) {
         throw std::runtime_error("Failed to open socket");
     }
@@ -169,17 +187,19 @@ void ServerImpl::RunAcceptor() {
             close(server_socket);
             throw std::runtime_error("Socket accept() failed");
         }
-
-        // TODO: Start new thread and process data from/to connection
-        {
-            std::string msg = "TODO: start new thread and process memcached protocol instead";
-            if (send(client_socket, msg.data(), msg.size(), 0) <= 0) {
-                close(client_socket);
-                close(server_socket);
-                throw std::runtime_error("Socket send() failed");
-            }
+        connections_mutex.lock();
+        auto data = std::make_shared<std::pair<ServerImpl*, int>>(this, client_socket);
+        if (connections.size() < max_workers) {
+            pthread_t client_thread;
+            std::cout << "data get " << data.get() << '\n';
+            pthread_create(&client_thread, NULL, RunConnectionProxy, data.get());
+            pthread_detach(client_thread);
+            connections.insert(client_thread);
+        } else {
             close(client_socket);
         }
+        connections_mutex.unlock();
+        std::cout << "socket closed" << std::endl;
     }
 
     // Cleanup on exit...
@@ -187,9 +207,103 @@ void ServerImpl::RunAcceptor() {
 }
 
 // See Server.h
-void ServerImpl::RunConnection() {
-    std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
-    // TODO: All connection work is here
+void ServerImpl::RunConnection(int client_socket) {
+    std::cout << "new conn run" << std::endl;
+    char input_buf[BUFFER_SIZE];
+    std::string exec_in_buf;
+    std::string exec_out_buf;
+    size_t received_count;
+    size_t parsed_count;
+    uint32_t data_size;
+
+    Protocol::Parser parser;
+
+    auto processing = true;
+
+    while (running.load() && processing) {
+        parser.Reset();
+        received_count = recv(client_socket, input_buf, BUFFER_SIZE, 0);
+        if (received_count <= 0) {
+            processing = false;
+        } else if (input_buf[0] == '\r') {
+            processing = false;
+        } else {
+            input_buf[received_count] = '\0';
+            std::cout << "buf: " << input_buf << '\n';
+            auto parse_success = parser.Parse(input_buf, received_count, parsed_count);
+            std::cout << "received count:" << received_count << '\n';
+            std::cout << "parsed count:" << parsed_count << '\n';
+            if (!parse_success) {
+                std::cout << "bad command" << '\n';
+                processing = false;
+            } else {
+                auto cmd = parser.Build(data_size);
+                std::cout << "build count:" << data_size << '\n';
+                std::cout << "cmd:" << (cmd != nullptr) << '\n';
+                if (cmd == nullptr) {
+                    std::cout << "bad command was built" << '\n';
+                    processing = false;
+                } else {
+                    std::unique_ptr<char[]> data(new char[data_size]);
+                    if(data_size > 0) {
+                        recChunks(client_socket, data.get(), data_size + 2);
+                        exec_in_buf = data.get();
+                    } else {
+                        exec_in_buf = "";
+                    }
+                    cmd->Execute(*pStorage, exec_in_buf, exec_out_buf);
+                    std::cout << "out execution: " << exec_out_buf << '\n';
+
+                    exec_out_buf += "\r\n";
+                    auto message_length = exec_out_buf.size();
+                    auto message_ptr = exec_out_buf.c_str();
+                    processing = sendChunks(client_socket, message_ptr, message_length);
+                }
+            }
+        }
+    }
+}
+
+void ServerImpl::CloseConnection(int client_socket) {
+    {
+        std::lock_guard<std::mutex> lock(connections_mutex);
+        connections.erase(pthread_self());
+    }
+    close(client_socket);
+    connections_cv.notify_one();
+}
+
+bool ServerImpl::sendChunks(int client_socket, const char* message_ptr, size_t message_length) {
+    auto send_left = message_length;
+    size_t send_rc;
+    while (send_left > 0)
+    {
+        send_rc = send(client_socket, message_ptr, send_left, 0);
+        if (send_rc != -1) {
+            send_left -= send_rc;
+            message_ptr += send_rc;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ServerImpl::recChunks(int client_socket, char* message_ptr, size_t message_length) {
+    auto input_buf = message_ptr;
+    auto rec_left = message_length;
+    size_t recieved;
+    while (rec_left > 0)
+    {
+        recieved = recv(client_socket, input_buf, rec_left, 0);
+        if (recieved != -1) {
+            rec_left -= recieved;
+            input_buf += recieved;
+        } else {
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace Blocking
