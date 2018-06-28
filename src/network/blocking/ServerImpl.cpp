@@ -114,6 +114,10 @@ void ServerImpl::Stop() {
 // See Server.h
 void ServerImpl::Join() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+    std::unique_lock<std::mutex> lock(connections_mutex);
+    while (!connections.empty()) {
+        connections_cv.wait(lock);
+    }
     pthread_join(accept_thread, 0);
 }
 
@@ -189,16 +193,28 @@ void ServerImpl::RunAcceptor() {
         }
         connections_mutex.lock();
         auto data = std::make_shared<std::pair<ServerImpl*, int>>(this, client_socket);
+        bool success;
         if (connections.size() < max_workers) {
             pthread_t client_thread;
             std::cout << "data get " << data.get() << '\n';
-            pthread_create(&client_thread, NULL, RunConnectionProxy, data.get());
-            pthread_detach(client_thread);
-            connections.insert(client_thread);
+            auto result = pthread_create(&client_thread, NULL, RunConnectionProxy, data.get());
+            if (result == 0) {
+                pthread_detach(client_thread);
+                connections.insert(client_thread);
+                success = true;
+            } else {
+                success = false;
+            }
         } else {
+            success = false;
+        }
+
+        if (!success) {
             close(client_socket);
         }
+
         connections_mutex.unlock();
+        connections_cv.notify_one();
         std::cout << "socket closed" << std::endl;
     }
 
