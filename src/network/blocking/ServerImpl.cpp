@@ -212,9 +212,7 @@ void ServerImpl::RunAcceptor() {
         if (!success) {
             close(client_socket);
         }
-
         connections_mutex.unlock();
-        connections_cv.notify_one();
         std::cout << "socket closed" << std::endl;
     }
 
@@ -278,6 +276,7 @@ void ServerImpl::RunConnection(int client_socket) {
             }
         }
     }
+    connections_cv.notify_all();
 }
 
 void ServerImpl::CloseConnection(int client_socket) {
