@@ -36,6 +36,11 @@ private:
     // Read-only
     uint32_t listen_port;
 
+    // Atomic flag to notify threads when it is time to stop. Note that
+    // flag must be atomic in order to safely publish changes cross thread
+    // bounds
+    std::shared_ptr<std::atomic<bool>> running;
+
     // Thread that is accepting new connections
     std::vector<Worker> workers;
 };

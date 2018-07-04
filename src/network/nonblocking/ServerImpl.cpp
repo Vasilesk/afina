@@ -24,7 +24,9 @@ namespace Network {
 namespace NonBlocking {
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : Server(ps) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps) : Server(ps) {
+        running = std::make_shared<std::atomic<bool>>();
+}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
@@ -56,7 +58,7 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
     }
 
     int opts = 1;
-    if (setsockopt(server_socket, SOL_SOCKET, 0, &opts, sizeof(opts)) == -1) {
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opts, sizeof(opts)) == -1) {
         close(server_socket);
         throw std::runtime_error("Socket setsockopt() failed");
     }
@@ -72,8 +74,9 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
         throw std::runtime_error("Socket listen() failed");
     }
 
+    running->store(true);
     for (int i = 0; i < n_workers; i++) {
-        workers.emplace_back(pStorage);
+        workers.emplace_back(pStorage, running);
         workers.back().Start(server_socket);
     }
 }
@@ -81,6 +84,7 @@ void ServerImpl::Start(uint32_t port, uint16_t n_workers) {
 // See Server.h
 void ServerImpl::Stop() {
     std::cout << "network debug: " << __PRETTY_FUNCTION__ << std::endl;
+    running->store(false);
     for (auto &worker : workers) {
         worker.Stop();
     }

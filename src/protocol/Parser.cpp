@@ -11,6 +11,7 @@
 #include <afina/execute/Get.h>
 #include <afina/execute/Set.h>
 #include <afina/execute/Stats.h>
+#include <afina/execute/Replace.h>
 
 namespace Afina {
 namespace Protocol {
@@ -177,6 +178,8 @@ std::unique_ptr<Execute::Command> Parser::Build(uint32_t &body_size) const {
         return std::unique_ptr<Execute::Command>(new Execute::Get(keys));
     } else if (name == "stats") {
         return std::unique_ptr<Execute::Command>(new Execute::Stats());
+    } else if (name == "replace") {
+        return std::unique_ptr<Execute::Command>(new Execute::Replace(keys[0], flags, exprtime));
     } else {
         throw std::runtime_error("Unsupported command");
     }
