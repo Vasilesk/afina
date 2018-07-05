@@ -5,7 +5,7 @@
 #include <iostream>
 #include <map>
 #include <setjmp.h>
-#include <tuple>
+#include <utility>
 
 namespace Afina {
 namespace Coroutine {
@@ -26,10 +26,10 @@ private:
         char *Low = nullptr;
 
         // coroutine stack end address
-        char *Hight = nullptr;
+        char *High = nullptr;
 
         // coroutine stack copy buffer
-        std::tuple<char *, uint32_t> Stack = std::make_tuple(nullptr, 0);
+        std::pair<char *, uint64_t> Stack = std::make_pair(nullptr, 0);
 
         // Saved coroutine context (registers)
         jmp_buf Environment;
